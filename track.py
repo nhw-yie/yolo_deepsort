@@ -372,5 +372,5 @@ if __name__ == "__main__":
     # Khoảng cách thực tế giữa các đường tham chiếu (mét)
     # Đây là khoảng cách ước lượng, cần hiệu chỉnh theo điều kiện thực tế
     real_distances = [15, 15, 15]  # Khoảng cách giữa các cặp đường liên tiếp
-    output_path = '/content/drive/MyDrive/output_videos/output_tracked_video.mp4'
+    output_path = '/content/drive/MyDrive/output_tracked_video.mp4'
     process_video('data/video5.mp4', output_path, reference_lines, real_distances)

@@ -12,6 +12,9 @@ import numpy as np
 import requests
 import torch
 from transformers import DPTImageProcessor, DPTForDepthEstimation
+from google.colab import drive
+drive.mount('/content/drive')
+
 # Chuyển đổi tọa độ bounding box
 def xyxy_to_xywh(*xyxy):
     bbox_left = min([xyxy[0].item(), xyxy[2].item()])
@@ -369,5 +372,5 @@ if __name__ == "__main__":
     # Khoảng cách thực tế giữa các đường tham chiếu (mét)
     # Đây là khoảng cách ước lượng, cần hiệu chỉnh theo điều kiện thực tế
     real_distances = [15, 15, 15]  # Khoảng cách giữa các cặp đường liên tiếp
-    
-    process_video('data/video5.mp4', 'output_tracked_video.mp4', reference_lines, real_distances)
+    output_path = '/content/drive/MyDrive/output_videos/output_tracked_video.mp4'
+    process_video('data/video5.mp4', output_path, reference_lines, real_distances)

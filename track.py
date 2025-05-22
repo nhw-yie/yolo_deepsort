@@ -352,9 +352,9 @@ def process_video(video_path, output_path, reference_lines=[200, 300, 400, 500],
 
         # Ghi và hiển thị
         out.write(frame)
-        cv2.imshow('Vehicle Tracking', frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+        #cv2.imshow('Vehicle Tracking', frame)
+        #if cv2.waitKey(1) & 0xFF == ord('q'):
+         #   break
 
     cap.release()
     out.release()

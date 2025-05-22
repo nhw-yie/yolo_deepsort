@@ -367,31 +367,66 @@ def process_video(video_path, output_path, reference_lines=[200, 300, 400, 500],
     print(f"Tổng thời gian xử lý: {time.time() - start_time:.2f} giây")
     print(f"FPS trung bình: {frame_count / (time.time() - start_time):.2f}")
 
-def main(
-    input_drive_file_id,
-    output_filename="output.mp4",
-    drive_output_folder_id=None
-):
-    # 1. Tải video từ Google Drive
-    input_path = "input_video.mp4"
-    download_video_from_drive(input_drive_file_id, input_path)
 
-    # 2. Load model
+def download_drive_video(share_url, save_path):
+    """
+    Tải video từ link Google Drive chia sẻ về local path
+    """
+    file_id = share_url.split("/d/")[1].split("/")[0]
+    gdown.download(f"https://drive.google.com/uc?id={file_id}", save_path, quiet=False)
+
+
+def main(drive_video_url: str, output_filename: str = "output.mp4"):
+    # Mount Google Drive
+    from google.colab import drive
+    drive.mount('/content/drive')
+
+    # Đường dẫn lưu video tải từ Drive về
+    input_video_path = "/content/input_video.mp4"
+
+    print(f"[INFO] Tải video từ: {drive_video_url}")
+    download_drive_video(drive_video_url, input_video_path)
+
+    # Load YOLO model
     model = YOLO("yolov8n.pt")
-    tracker = DeepSort()
 
-    # 3. Process video
-    process_video(model, tracker, input_path, output_filename)
+    # Load Deep SORT
+    cfg = get_config()
+    cfg.merge_from_file("yolo_deepsort/yolo_deepsort/deep_sort_pytorch/configs/deep_sort.yaml")
+    deepsort = DeepSort(cfg.DEEPSORT.REID_CKPT,
+                        max_dist=cfg.DEEPSORT.MAX_DIST,
+                        max_iou_distance=cfg.DEEPSORT.MAX_IOU_DISTANCE,
+                        max_age=cfg.DEEPSORT.MAX_AGE,
+                        n_init=cfg.DEEPSORT.N_INIT,
+                        nn_budget=cfg.DEEPSORT.NN_BUDGET,
+                        use_cuda=torch.cuda.is_available())
 
-    # 4. Upload kết quả lên Google Drive
-    upload_file_to_drive(output_filename, drive_output_folder_id)
+    # Video I/O
+    cap = cv2.VideoCapture(input_video_path)
+    width, height, fps = int(cap.get(3)), int(cap.get(4)), cap.get(cv2.CAP_PROP_FPS)
+    output_path = f"/content/drive/MyDrive/{output_filename}"
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
+    print(f"[INFO] Bắt đầu xử lý video...")
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-if __name__ == "__main__":
-    # Nhập ID của video trên Google Drive
-    input_drive_file_id = "YOUR_INPUT_VIDEO_ID"
-    
-    # Nếu muốn lưu vào folder cụ thể, nhập ID folder Drive, không thì để None
-    drive_output_folder_id = "YOUR_OUTPUT_FOLDER_ID"  # or None
+        # YOLO inference
+        results = model(frame, verbose=False)[0]
+        detections = results.boxes.xyxy.cpu()
+        confidences = results.boxes.conf.cpu()
+        class_ids = results.boxes.cls.cpu().int()
 
-    main(input_drive_file_id, "output.mp4", drive_output_folder_id)
+        # Deep SORT tracking
+        outputs = deepsort.update(detections, confidences, class_ids, frame)
+
+        # Vẽ và ghi video
+        draw_boxes(frame, outputs)
+        out.write(frame)
+
+    cap.release()
+    out.release()
+    print(f"[DONE] Lưu video đã xử lý tại: {output_path}")

@@ -12,8 +12,11 @@ import numpy as np
 import requests
 import torch
 from transformers import DPTImageProcessor, DPTForDepthEstimation
-from google.colab import drive
-drive.mount('/content/drive')
+
+
+def download_video_from_drive(file_id, output_path):
+    url = f'https://drive.google.com/uc?id={file_id}'
+    gdown.download(url, output_path, quiet=False)
 
 # Chuyển đổi tọa độ bounding box
 def xyxy_to_xywh(*xyxy):
@@ -364,13 +367,31 @@ def process_video(video_path, output_path, reference_lines=[200, 300, 400, 500],
     print(f"Tổng thời gian xử lý: {time.time() - start_time:.2f} giây")
     print(f"FPS trung bình: {frame_count / (time.time() - start_time):.2f}")
 
+def main(
+    input_drive_file_id,
+    output_filename="output.mp4",
+    drive_output_folder_id=None
+):
+    # 1. Tải video từ Google Drive
+    input_path = "input_video.mp4"
+    download_video_from_drive(input_drive_file_id, input_path)
+
+    # 2. Load model
+    model = YOLO("yolov8n.pt")
+    tracker = DeepSort()
+
+    # 3. Process video
+    process_video(model, tracker, input_path, output_filename)
+
+    # 4. Upload kết quả lên Google Drive
+    upload_file_to_drive(output_filename, drive_output_folder_id)
+
+
 if __name__ == "__main__":
-    # Định nghĩa các đường tham chiếu (tọa độ y)
-    # Chọn 4 đường ở các độ cao khác nhau trên màn hình
-    reference_lines = [200, 300, 400, 500]
+    # Nhập ID của video trên Google Drive
+    input_drive_file_id = "YOUR_INPUT_VIDEO_ID"
     
-    # Khoảng cách thực tế giữa các đường tham chiếu (mét)
-    # Đây là khoảng cách ước lượng, cần hiệu chỉnh theo điều kiện thực tế
-    real_distances = [15, 15, 15]  # Khoảng cách giữa các cặp đường liên tiếp
-    output_path = '/content/drive/MyDrive/output_tracked_video.mp4'
-    process_video('data/video5.mp4', output_path, reference_lines, real_distances)
+    # Nếu muốn lưu vào folder cụ thể, nhập ID folder Drive, không thì để None
+    drive_output_folder_id = "YOUR_OUTPUT_FOLDER_ID"  # or None
+
+    main(input_drive_file_id, "output.mp4", drive_output_folder_id)

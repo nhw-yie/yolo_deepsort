@@ -9,14 +9,11 @@ from deep_sort.deep_sort.detection import Detection
 from deep_sort.tools import generate_detections as gdet
 from PIL import Image
 import numpy as np
-import requests
-import torch
+from IPython.display import  Video, display
+import matplotlib.pyplot as plt
 from transformers import DPTImageProcessor, DPTForDepthEstimation
 
 
-def download_video_from_drive(file_id, output_path):
-    url = f'https://drive.google.com/uc?id={file_id}'
-    gdown.download(url, output_path, quiet=False)
 
 # Chuyển đổi tọa độ bounding box
 def xyxy_to_xywh(*xyxy):
@@ -40,7 +37,6 @@ def xyxy_to_tlwh(bbox_xyxy):
     return tlwh_bboxs
 
 
-
 # Phương pháp 1: Hiệu chuẩn dựa trên vùng
 class RegionBasedCalibration:
     def __init__(self, height, num_regions=10):
@@ -48,8 +44,8 @@ class RegionBasedCalibration:
         self.num_regions = num_regions
         self.region_height = height / num_regions
         # Hệ số PPM giảm dần từ dưới lên trên (từ gần đến xa)
-        self.ppm_values = np.linspace(8, 2, num_regions)  # Từ 8 (gần) đến 2 (xa)
-        
+        self.ppm_values = np.linspace(10, 5, num_regions)  # Từ 2 (gần) đến 1 (xa)
+
     def get_region(self, y):
         # Lấy chỉ số vùng dựa trên tọa độ y
         # Đảm bảo y nằm trong phạm vi hợp lệ
@@ -355,9 +351,9 @@ def process_video(video_path, output_path, reference_lines=[200, 300, 400, 500],
 
         # Ghi và hiển thị
         out.write(frame)
-        #cv2.imshow('Vehicle Tracking', frame)
-        #if cv2.waitKey(1) & 0xFF == ord('q'):
-         #   break
+        cv2.imshow('Vehicle Tracking', frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
     cap.release()
     out.release()
@@ -367,66 +363,14 @@ def process_video(video_path, output_path, reference_lines=[200, 300, 400, 500],
     print(f"Tổng thời gian xử lý: {time.time() - start_time:.2f} giây")
     print(f"FPS trung bình: {frame_count / (time.time() - start_time):.2f}")
 
-
-def download_drive_video(share_url, save_path):
-    """
-    Tải video từ link Google Drive chia sẻ về local path
-    """
-    file_id = share_url.split("/d/")[1].split("/")[0]
-    gdown.download(f"https://drive.google.com/uc?id={file_id}", save_path, quiet=False)
-
-
-def main(drive_video_url: str, output_filename: str = "output.mp4"):
-    # Mount Google Drive
-    from google.colab import drive
-    drive.mount('/content/drive')
-
-    # Đường dẫn lưu video tải từ Drive về
-    input_video_path = "/content/input_video.mp4"
-
-    print(f"[INFO] Tải video từ: {drive_video_url}")
-    download_drive_video(drive_video_url, input_video_path)
-
-    # Load YOLO model
-    model = YOLO("yolov8n.pt")
-
-    # Load Deep SORT
-    cfg = get_config()
-    cfg.merge_from_file("yolo_deepsort/yolo_deepsort/deep_sort_pytorch/configs/deep_sort.yaml")
-    deepsort = DeepSort(cfg.DEEPSORT.REID_CKPT,
-                        max_dist=cfg.DEEPSORT.MAX_DIST,
-                        max_iou_distance=cfg.DEEPSORT.MAX_IOU_DISTANCE,
-                        max_age=cfg.DEEPSORT.MAX_AGE,
-                        n_init=cfg.DEEPSORT.N_INIT,
-                        nn_budget=cfg.DEEPSORT.NN_BUDGET,
-                        use_cuda=torch.cuda.is_available())
-
-    # Video I/O
-    cap = cv2.VideoCapture(input_video_path)
-    width, height, fps = int(cap.get(3)), int(cap.get(4)), cap.get(cv2.CAP_PROP_FPS)
-    output_path = f"/content/drive/MyDrive/{output_filename}"
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-
-    print(f"[INFO] Bắt đầu xử lý video...")
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        # YOLO inference
-        results = model(frame, verbose=False)[0]
-        detections = results.boxes.xyxy.cpu()
-        confidences = results.boxes.conf.cpu()
-        class_ids = results.boxes.cls.cpu().int()
-
-        # Deep SORT tracking
-        outputs = deepsort.update(detections, confidences, class_ids, frame)
-
-        # Vẽ và ghi video
-        draw_boxes(frame, outputs)
-        out.write(frame)
-
-    cap.release()
-    out.release()
-    print(f"[DONE] Lưu video đã xử lý tại: {output_path}")
+if __name__ == "__main__":
+    # Định nghĩa các đường tham chiếu (tọa độ y)
+    # Chọn 4 đường ở các độ cao khác nhau trên màn hình
+    reference_lines = [200, 300, 400, 500]
+    
+    # Khoảng cách thực tế giữa các đường tham chiếu (mét)
+    # Đây là khoảng cách ước lượng, cần hiệu chỉnh theo điều kiện thực tế
+    real_distances = [15, 15, 15]  # Khoảng cách giữa các cặp đường liên tiếp
+    
+    process_video('data/video2.mp4', 'output_tracked_video.mp4', reference_lines, real_distances)
+    
